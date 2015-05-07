@@ -1,5 +1,8 @@
 #Header 1 Welcome to the QuickReach Interface component
 
+This is a Android interface component.In this user can choose his favorite apps from the list of installed apps.These are added to quick reach folder,which stays on the top of all apps and home screens.
+
+
 ###This is a QuickReach folder.This folder icon stay on the top of all Home screens and apps.
 
 
