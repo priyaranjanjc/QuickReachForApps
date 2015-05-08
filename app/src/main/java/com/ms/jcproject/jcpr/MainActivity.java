@@ -19,4 +19,5 @@ public class MainActivity extends Activity {
         fm.beginTransaction().add(R.id.main_fragment, mFragment).commit();
         startService(new Intent(this, QuickAppService.class));
     }
+
 }

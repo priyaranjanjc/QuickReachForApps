@@ -14,6 +14,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.hardware.display.DisplayManager;
 import android.os.Handler;
 import android.os.IBinder;
+import android.util.Log;
 import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -21,7 +22,6 @@ import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.WindowManager;
 import android.widget.AdapterView;
-import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -37,13 +37,11 @@ import java.util.Set;
 public class QuickAppService extends Service {
 
     private WindowManager.LayoutParams params;
+    private WindowManager.LayoutParams deleteParams;
     private Context mContext;
     private DisplayManager displayManager;
     private Display display;
     private PopupWindow pw;
-    private Button games;
-    private Button favourites;
-    private Button social;
     private ActivityManager activityManager;
     private List<RecentTaskInfo> x;
     private List<ApplicationInfo> recentApps = new ArrayList<ApplicationInfo>();
@@ -60,7 +58,7 @@ public class QuickAppService extends Service {
     private Runnable mSetIconTransparent = new Runnable() {
         @Override
         public void run() {
-            mView.setAlpha(0.6f);
+            mView.setAlpha(0.3f);
         }
     };
     private View.OnClickListener mCategoryClickListener = new View.OnClickListener() {
@@ -76,7 +74,8 @@ public class QuickAppService extends Service {
             }
         }
     };
-    private long lastPressTime;
+    private WindowManager wmgr;
+    private ImageView mDelete;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -106,11 +105,26 @@ public class QuickAppService extends Service {
         params.width = (int) getResources().getDimension(android.R.dimen.app_icon_size);
         params.height = (int) getResources().getDimension(android.R.dimen.app_icon_size);
 
-
-        final WindowManager wmgr = (WindowManager) getApplicationContext()
+        wmgr = (WindowManager) getApplicationContext()
                 .getSystemService(Context.WINDOW_SERVICE);
 
         activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+
+        mDelete = new ImageView(mContext);
+        mDelete.setImageResource(R.drawable.delete);
+        mDelete.setScaleType(ImageView.ScaleType.FIT_XY);
+        mDelete.setPadding(10,10,10,10);
+
+        deleteParams = new WindowManager.LayoutParams();
+        deleteParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        deleteParams.format = PixelFormat.RGBA_8888;
+        deleteParams.type = WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
+        deleteParams.width = (int) getResources().getDimension(android.R.dimen.app_icon_size);
+        deleteParams.height = (int) getResources().getDimension(android.R.dimen.app_icon_size);
+        deleteParams.y = display.getHeight() -(deleteParams.height);
+
+        wmgr.addView(mDelete, deleteParams);
+        mDelete.setVisibility(View.GONE);
         wmgr.addView(mView, params);
 
         mView.setOnTouchListener(new View.OnTouchListener() {
@@ -125,30 +139,43 @@ public class QuickAppService extends Service {
                 mHandler.removeCallbacksAndMessages(null);
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        long pressTime = System.currentTimeMillis();
-
-
-                        // If double click...
-                        if (pressTime - lastPressTime <= 300) {
-                            QuickAppService.this.stopSelf();
-                        }
-                        lastPressTime = pressTime;
                         initialX = params.x;
                         initialY = params.y;
                         initialTouchX = event.getRawX();
                         initialTouchY = event.getRawY();
-                        start = System.currentTimeMillis();
+
+                        mDelete.setVisibility(View.VISIBLE);
                         break;
                     //return true;
                     case MotionEvent.ACTION_UP:
+                        mHandler.postDelayed(mSetIconTransparent, 8000);
+                        mDelete.setVisibility(View.GONE);
 
+                        int[] locationDelete = new int[2];
+                        int[] locationMain = new int[2];
+                        mDelete.getLocationOnScreen(locationDelete);
+
+                        Log.i("sravan", "params " + params.x + " " + params.y);
+                        Log.i("sravan", "deletparams " + deleteParams.x + " " + deleteParams.y);
+                        Log.i("sravan", locationDelete[0] + " " + locationDelete[1]);
+                        mView.getLocationOnScreen(locationMain);
+                        locationMain[0] = locationMain[0] + mDelete.getWidth() / 2;
+                        locationMain[1] = locationMain[1] + mDelete.getHeight()/2;
+                        Log.i("sravan", locationMain[0] + " " + locationMain[1]);
+
+                        if(locationMain[0]  >= locationDelete[0]  &&  locationMain[0] <=
+                                locationDelete[0] + mDelete.getWidth()){
+                            if(locationMain[1] >= locationDelete[1]  &&  locationMain[1]  <=
+                                    locationDelete[1] + mDelete.getHeight()){
+                                stopSelf();
+                            }
+                        }
                         break;
                     case MotionEvent.ACTION_MOVE:
                         params.x = initialX + (int) (event.getRawX() - initialTouchX);
                         params.y = initialY + (int) (event.getRawY() - initialTouchY);
                         wmgr.updateViewLayout(mView, params);
 
-                        //return true;
                         break;
                 }
                 return false;
@@ -163,16 +190,7 @@ public class QuickAppService extends Service {
             }
         });
 
-        mView.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                QuickAppService.this.stopSelf();
-                return false;
-            }
-        });
-
         mHandler.postDelayed(mSetIconTransparent, 8000);
-
         super.onCreate();
     }
 
@@ -236,12 +254,14 @@ public class QuickAppService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         // TODO Auto-generated method stub
         pm = getPackageManager();
-        return super.onStartCommand(intent, flags, startId);
+        return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         // TODO Auto-generated method stub
+        wmgr.removeView(mView);
+        wmgr.removeView(mDelete);
         super.onDestroy();
     }
 
